@@ -1,7 +1,13 @@
 import pytest
 
-from app.evm import calculate_evm, interpret_cpi, interpret_spi
+from types import SimpleNamespace
 
+from app.evm import (
+    calculate_evm,
+    calculate_project_evm,
+    interpret_cpi,
+    interpret_spi,
+)
 
 def test_calculate_evm_returns_expected_values():
     result = calculate_evm(
@@ -88,3 +94,47 @@ def test_interpret_cpi(cpi, expected):
 )
 def test_interpret_spi(spi, expected):
     assert interpret_spi(spi) == expected
+
+def test_calculate_project_evm():
+    activities = [
+        SimpleNamespace(
+            bac=10000,
+            planned_progress=50,
+            actual_progress=40,
+            actual_cost=4500,
+        ),
+        SimpleNamespace(
+            bac=5000,
+            planned_progress=60,
+            actual_progress=70,
+            actual_cost=3000,
+        ),
+    ]
+
+    result = calculate_project_evm(activities)
+
+    assert result["bac"] == pytest.approx(15000)
+    assert result["pv"] == pytest.approx(8000)
+    assert result["ev"] == pytest.approx(7500)
+    assert result["ac"] == pytest.approx(7500)
+    assert result["cv"] == pytest.approx(0)
+    assert result["sv"] == pytest.approx(-500)
+    assert result["cpi"] == pytest.approx(1)
+    assert result["spi"] == pytest.approx(0.9375)
+    assert result["eac"] == pytest.approx(15000)
+    assert result["vac"] == pytest.approx(0)
+
+
+def test_calculate_project_evm_without_activities():
+    result = calculate_project_evm([])
+
+    assert result["bac"] == 0
+    assert result["pv"] == 0
+    assert result["ev"] == 0
+    assert result["ac"] == 0
+    assert result["cpi"] is None
+    assert result["spi"] is None
+    assert result["eac"] is None
+    assert result["vac"] is None
+    assert result["cost_status"] == "Not available"
+    assert result["schedule_status"] == "Not available"

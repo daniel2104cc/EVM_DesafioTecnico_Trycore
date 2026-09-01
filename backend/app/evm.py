@@ -54,3 +54,55 @@ def calculate_evm(
         "cost_status": interpret_cpi(cpi),
         "schedule_status": interpret_spi(spi),
     }
+
+def calculate_project_evm(activities: list) -> dict:
+    if not activities:
+        return {
+            "bac": 0,
+            "pv": 0,
+            "ev": 0,
+            "ac": 0,
+            "cv": 0,
+            "sv": 0,
+            "cpi": None,
+            "spi": None,
+            "eac": None,
+            "vac": None,
+            "cost_status": "Not available",
+            "schedule_status": "Not available",
+        }
+
+    total_bac = sum(activity.bac for activity in activities)
+    total_pv = sum(
+        (activity.planned_progress / 100) * activity.bac
+        for activity in activities
+    )
+    total_ev = sum(
+        (activity.actual_progress / 100) * activity.bac
+        for activity in activities
+    )
+    total_ac = sum(activity.actual_cost for activity in activities)
+
+    cv = total_ev - total_ac
+    sv = total_ev - total_pv
+
+    cpi = total_ev / total_ac if total_ac > 0 else None
+    spi = total_ev / total_pv if total_pv > 0 else None
+
+    eac = total_bac / cpi if cpi not in (None, 0) else None
+    vac = total_bac - eac if eac is not None else None
+
+    return {
+        "bac": total_bac,
+        "pv": total_pv,
+        "ev": total_ev,
+        "ac": total_ac,
+        "cv": cv,
+        "sv": sv,
+        "cpi": cpi,
+        "spi": spi,
+        "eac": eac,
+        "vac": vac,
+        "cost_status": interpret_cpi(cpi),
+        "schedule_status": interpret_spi(spi),
+    }
