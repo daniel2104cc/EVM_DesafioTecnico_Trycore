@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.evm import calculate_evm, calculate_project_evm
 
 from app.database import get_db
 from app.models import Activity, Project
@@ -11,6 +12,8 @@ from app.schemas import (
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
+    ActivityEVMResponse,
+    ProjectEVMResponse,
 )
 
 app = FastAPI(
@@ -237,3 +240,51 @@ def delete_activity(
     db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@app.get(
+    "/projects/{project_id}/evm",
+    response_model=ProjectEVMResponse,
+)
+def get_project_evm(
+    project_id: int,
+    db: Session = Depends(get_db),
+):
+    project = db.get(Project, project_id)
+
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    activities_with_evm = []
+
+    for activity in project.activities:
+        metrics = calculate_evm(
+            bac=activity.bac,
+            planned_progress=activity.planned_progress,
+            actual_progress=activity.actual_progress,
+            actual_cost=activity.actual_cost,
+        )
+
+        activities_with_evm.append(
+            {
+                "id": activity.id,
+                "project_id": activity.project_id,
+                "name": activity.name,
+                "bac": activity.bac,
+                "planned_progress": activity.planned_progress,
+                "actual_progress": activity.actual_progress,
+                "actual_cost": activity.actual_cost,
+                **metrics,
+            }
+        )
+
+    summary = calculate_project_evm(project.activities)
+
+    return {
+        "project_id": project.id,
+        "project_name": project.name,
+        "summary": summary,
+        "activities": activities_with_evm,
+    }
