@@ -71,3 +71,14 @@ frontend/
 - Node.js
 - PostgreSQL
 - Git
+
+## Database setup
+
+Create a PostgreSQL database and user before running the application.
+
+Example:
+
+```sql
+CREATE USER evm_user WITH PASSWORD 'your_password';
+CREATE DATABASE evm_db OWNER evm_user;
+```
