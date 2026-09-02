@@ -1,6 +1,6 @@
-import pytest
-
 from types import SimpleNamespace
+
+import pytest
 
 from app.evm import (
     calculate_evm,
@@ -8,6 +8,7 @@ from app.evm import (
     interpret_cpi,
     interpret_spi,
 )
+
 
 def test_calculate_evm_returns_expected_values():
     result = calculate_evm(

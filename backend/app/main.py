@@ -1,27 +1,30 @@
 from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.evm import calculate_evm, calculate_project_evm
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_db
+from app.evm import calculate_evm, calculate_project_evm
 from app.models import Activity, Project
 from app.schemas import (
     ActivityCreate,
     ActivityResponse,
     ActivityUpdate,
     ProjectCreate,
+    ProjectEVMResponse,
     ProjectResponse,
     ProjectUpdate,
-    ActivityEVMResponse,
-    ProjectEVMResponse,
 )
 
 app = FastAPI(
     title="EVM Project Dashboard API",
+    description=(
+        "REST API for project and activity management "
+        "with Earned Value Management calculations."
+    ),
     version="1.0.0",
     docs_url="/api-docs",
-)
+)   
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -39,6 +42,7 @@ def health_check():
     "/projects",
     response_model=ProjectResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create project",
 )
 def create_project(
     project_data: ProjectCreate,
