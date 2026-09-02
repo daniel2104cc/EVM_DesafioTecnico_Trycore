@@ -22,6 +22,40 @@ const emptyActivity = {
   actual_cost: "",
 };
 
+async function fetchProjectsData() {
+  const response = await fetch(`${API_URL}/projects`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load projects");
+  }
+
+  return response.json();
+}
+
+async function fetchProjectEvmData(projectId) {
+  const response = await fetch(`${API_URL}/projects/${projectId}/evm`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load project EVM data");
+  }
+
+  return response.json();
+}
+
+function formatNumber(value) {
+  if (value === null || value === undefined) {
+    return "N/A";
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "N/A";
+  }
+
+  return number.toFixed(2);
+}
+
 function App() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -31,38 +65,66 @@ function App() {
   const [activityForm, setActivityForm] = useState(emptyActivity);
   const [editingActivityId, setEditingActivityId] = useState(null);
 
+  // Load projects when the application starts.
   useEffect(() => {
-    loadProjects();
+    async function loadInitialProjects() {
+      try {
+        const data = await fetchProjectsData();
+
+        setProjects(data);
+
+        if (data.length > 0) {
+          setSelectedProjectId(String(data[0].id));
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadInitialProjects();
   }, []);
 
+  // Load EVM information whenever the selected project changes.
   useEffect(() => {
-    if (selectedProjectId) {
-      loadProjectEvm(selectedProjectId);
-    } else {
-      setProjectData(null);
-    }
-  }, [selectedProjectId]);
-
-  async function loadProjects() {
-    const response = await fetch(`${API_URL}/projects`);
-    const data = await response.json();
-
-    setProjects(data);
-
-    if (data.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(String(data[0].id));
-    }
-  }
-
-  async function loadProjectEvm(projectId) {
-    const response = await fetch(`${API_URL}/projects/${projectId}/evm`);
-
-    if (!response.ok) {
+    if (!selectedProjectId) {
       return;
     }
 
-    const data = await response.json();
-    setProjectData(data);
+    async function loadSelectedProject() {
+      try {
+        const data = await fetchProjectEvmData(selectedProjectId);
+        setProjectData(data);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadSelectedProject();
+  }, [selectedProjectId]);
+
+  async function refreshProjectEvm() {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    try {
+      const data = await fetchProjectEvmData(selectedProjectId);
+      setProjectData(data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function handleProjectSelection(event) {
+    const projectId = event.target.value;
+
+    setSelectedProjectId(projectId);
+
+    if (!projectId) {
+      setProjectData(null);
+      setEditingActivityId(null);
+      setActivityForm(emptyActivity);
+    }
   }
 
   async function createProject(event) {
@@ -72,22 +134,32 @@ function App() {
       return;
     }
 
-    const response = await fetch(`${API_URL}/projects`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: projectName,
-      }),
-    });
+    try {
+      const response = await fetch(`${API_URL}/projects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: projectName,
+        }),
+      });
 
-    const project = await response.json();
+      if (!response.ok) {
+        throw new Error("Failed to create project");
+      }
 
-    setProjectName("");
-    await loadProjects();
-    setSelectedProjectId(String(project.id));
+      const project = await response.json();
+      const updatedProjects = await fetchProjectsData();
+
+      setProjects(updatedProjects);
+      setProjectName("");
+      setSelectedProjectId(String(project.id));
+    } catch (error) {
+      console.error(error);
+    }
   }
+
   async function deleteProject() {
     if (!selectedProjectId) {
       return;
@@ -101,26 +173,32 @@ function App() {
       return;
     }
 
-    const response = await fetch(`${API_URL}/projects/${selectedProjectId}`, {
-      method: "DELETE",
-    });
+    try {
+      const response = await fetch(`${API_URL}/projects/${selectedProjectId}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) {
-      return;
-    }
+      if (!response.ok) {
+        throw new Error("Failed to delete project");
+      }
 
-    const projectsResponse = await fetch(`${API_URL}/projects`);
-    const remainingProjects = await projectsResponse.json();
+      const remainingProjects = await fetchProjectsData();
 
-    setProjects(remainingProjects);
-    setProjectData(null);
+      setProjects(remainingProjects);
+      setProjectData(null);
+      setEditingActivityId(null);
+      setActivityForm(emptyActivity);
 
-    if (remainingProjects.length > 0) {
-      setSelectedProjectId(String(remainingProjects[0].id));
-    } else {
-      setSelectedProjectId("");
+      if (remainingProjects.length > 0) {
+        setSelectedProjectId(String(remainingProjects[0].id));
+      } else {
+        setSelectedProjectId("");
+      }
+    } catch (error) {
+      console.error(error);
     }
   }
+
   function handleActivityChange(event) {
     const { name, value } = event.target;
 
@@ -145,28 +223,41 @@ function App() {
       actual_cost: Number(activityForm.actual_cost),
     };
 
-    if (editingActivityId) {
-      await fetch(`${API_URL}/activities/${editingActivityId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await fetch(`${API_URL}/projects/${selectedProjectId}/activities`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+    try {
+      let response;
+
+      if (editingActivityId) {
+        response = await fetch(`${API_URL}/activities/${editingActivityId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await fetch(
+          `${API_URL}/projects/${selectedProjectId}/activities`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          },
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to save activity");
+      }
+
+      setActivityForm(emptyActivity);
+      setEditingActivityId(null);
+
+      await refreshProjectEvm();
+    } catch (error) {
+      console.error(error);
     }
-
-    setActivityForm(emptyActivity);
-    setEditingActivityId(null);
-
-    await loadProjectEvm(selectedProjectId);
   }
 
   function editActivity(activity) {
@@ -182,11 +273,19 @@ function App() {
   }
 
   async function deleteActivity(activityId) {
-    await fetch(`${API_URL}/activities/${activityId}`, {
-      method: "DELETE",
-    });
+    try {
+      const response = await fetch(`${API_URL}/activities/${activityId}`, {
+        method: "DELETE",
+      });
 
-    await loadProjectEvm(selectedProjectId);
+      if (!response.ok) {
+        throw new Error("Failed to delete activity");
+      }
+
+      await refreshProjectEvm();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   function cancelEdit() {
@@ -195,6 +294,14 @@ function App() {
   }
 
   const summary = projectData?.summary;
+
+  const chartData =
+    projectData?.activities.map((activity) => ({
+      name: activity.name,
+      pv: Number(activity.pv),
+      ev: Number(activity.ev),
+      actual_cost: Number(activity.actual_cost),
+    })) ?? [];
 
   return (
     <main className="container">
@@ -206,15 +313,13 @@ function App() {
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
             placeholder="Project name"
+            required
           />
 
           <button type="submit">Create project</button>
         </form>
 
-        <select
-          value={selectedProjectId}
-          onChange={(event) => setSelectedProjectId(event.target.value)}
-        >
+        <select value={selectedProjectId} onChange={handleProjectSelection}>
           <option value="">Select project</option>
 
           {projects.map((project) => (
@@ -223,6 +328,7 @@ function App() {
             </option>
           ))}
         </select>
+
         <button
           type="button"
           onClick={deleteProject}
@@ -232,36 +338,37 @@ function App() {
         </button>
       </section>
 
-      {projectData && (
+      {projectData && summary && (
         <>
           <h2>{projectData.project_name}</h2>
 
           <section className="cards">
             <article>
               <span>BAC</span>
-              <strong>${summary.bac.toFixed(2)}</strong>
+              <strong>${formatNumber(summary.bac)}</strong>
             </article>
 
             <article>
               <span>CPI</span>
-              <strong>
-                {summary.cpi !== null ? summary.cpi.toFixed(2) : "N/A"}
-              </strong>
+
+              <strong>{formatNumber(summary.cpi)}</strong>
+
               <small>{summary.cost_status}</small>
             </article>
 
             <article>
               <span>SPI</span>
-              <strong>
-                {summary.spi !== null ? summary.spi.toFixed(2) : "N/A"}
-              </strong>
+
+              <strong>{formatNumber(summary.spi)}</strong>
+
               <small>{summary.schedule_status}</small>
             </article>
 
             <article>
               <span>EAC</span>
+
               <strong>
-                {summary.eac !== null ? `$${summary.eac.toFixed(2)}` : "N/A"}
+                {summary.eac !== null ? `$${formatNumber(summary.eac)}` : "N/A"}
               </strong>
             </article>
           </section>
@@ -281,6 +388,8 @@ function App() {
               <input
                 name="bac"
                 type="number"
+                min="0"
+                step="0.01"
                 placeholder="BAC"
                 value={activityForm.bac}
                 onChange={handleActivityChange}
@@ -292,6 +401,7 @@ function App() {
                 type="number"
                 min="0"
                 max="100"
+                step="0.01"
                 placeholder="Planned %"
                 value={activityForm.planned_progress}
                 onChange={handleActivityChange}
@@ -303,6 +413,7 @@ function App() {
                 type="number"
                 min="0"
                 max="100"
+                step="0.01"
                 placeholder="Actual %"
                 value={activityForm.actual_progress}
                 onChange={handleActivityChange}
@@ -312,6 +423,8 @@ function App() {
               <input
                 name="actual_cost"
                 type="number"
+                min="0"
+                step="0.01"
                 placeholder="Actual cost"
                 value={activityForm.actual_cost}
                 onChange={handleActivityChange}
@@ -354,31 +467,35 @@ function App() {
                   {projectData.activities.map((activity) => (
                     <tr key={activity.id}>
                       <td>{activity.name}</td>
-                      <td>{Number(activity.bac).toFixed(2)}</td>
-                      <td>{activity.pv.toFixed(2)}</td>
-                      <td>{activity.ev.toFixed(2)}</td>
-                      <td>{Number(activity.actual_cost).toFixed(2)}</td>
-                      <td>{activity.cv.toFixed(2)}</td>
-                      <td>{activity.sv.toFixed(2)}</td>
+
+                      <td>{formatNumber(activity.bac)}</td>
+
+                      <td>{formatNumber(activity.pv)}</td>
+
+                      <td>{formatNumber(activity.ev)}</td>
+
+                      <td>{formatNumber(activity.actual_cost)}</td>
+
+                      <td>{formatNumber(activity.cv)}</td>
+
+                      <td>{formatNumber(activity.sv)}</td>
+
+                      <td>{formatNumber(activity.cpi)}</td>
+
+                      <td>{formatNumber(activity.spi)}</td>
 
                       <td>
-                        {activity.cpi !== null
-                          ? activity.cpi.toFixed(2)
-                          : "N/A"}
-                      </td>
-
-                      <td>
-                        {activity.spi !== null
-                          ? activity.spi.toFixed(2)
-                          : "N/A"}
-                      </td>
-
-                      <td>
-                        <button onClick={() => editActivity(activity)}>
+                        <button
+                          type="button"
+                          onClick={() => editActivity(activity)}
+                        >
                           Edit
                         </button>
 
-                        <button onClick={() => deleteActivity(activity.id)}>
+                        <button
+                          type="button"
+                          onClick={() => deleteActivity(activity.id)}
+                        >
                           Delete
                         </button>
                       </td>
@@ -390,18 +507,52 @@ function App() {
           </section>
 
           <section className="panel chart">
-            <h3>PV vs EV vs AC</h3>
+            <h3>PV vs EV vs AC by activity</h3>
+
+            <p>Accumulated values at the current cutoff date</p>
 
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={projectData.activities}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
+
+                <XAxis
+                  dataKey="name"
+                  label={{
+                    value: "Activity",
+                    position: "insideBottom",
+                    offset: -5,
+                  }}
+                />
+
+                <YAxis
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat("es-CO", {
+                      notation: "compact",
+                    }).format(value)
+                  }
+                  label={{
+                    value: "Value (COP)",
+                    angle: -90,
+                    position: "insideLeft",
+                  }}
+                />
+
+                <Tooltip
+                  formatter={(value) =>
+                    new Intl.NumberFormat("es-CO", {
+                      style: "currency",
+                      currency: "COP",
+                      maximumFractionDigits: 0,
+                    }).format(Number(value))
+                  }
+                />
+
                 <Legend />
 
-                <Bar dataKey="pv" name="PV- Planned Value" fill="#2563eb" />
+                <Bar dataKey="pv" name="PV - Planned Value" fill="#2563eb" />
+
                 <Bar dataKey="ev" name="EV - Earned Value" fill="#16a34a" />
+
                 <Bar
                   dataKey="actual_cost"
                   name="AC - Actual Cost"

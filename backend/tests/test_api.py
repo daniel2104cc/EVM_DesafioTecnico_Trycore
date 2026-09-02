@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+
 def create_project(client):
     response = client.post(
         "/projects",
