@@ -1,0 +1,115 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f5f6f8;
+  font-family: Arial, sans-serif;
+  color: #222;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.container {
+  width: min(1400px, 94%);
+  margin: 30px auto;
+}
+
+h1 {
+  margin-bottom: 24px;
+}
+
+.project-section {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.project-section form {
+  display: flex;
+  gap: 8px;
+}
+
+input,
+select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.cards article,
+.panel {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.cards article {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cards strong {
+  font-size: 1.5rem;
+}
+
+.panel {
+  margin-bottom: 22px;
+}
+
+.activity-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+td button {
+  margin-right: 5px;
+}
+
+.chart {
+  min-height: 420px;
+}
+
+@media (max-width: 800px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
