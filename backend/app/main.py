@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.evm import calculate_evm, calculate_project_evm
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_db
 from app.models import Activity, Project
@@ -21,7 +22,13 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api-docs",
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health_check():
